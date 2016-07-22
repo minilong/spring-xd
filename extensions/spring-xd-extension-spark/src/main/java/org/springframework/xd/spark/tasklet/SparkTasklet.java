@@ -188,12 +188,13 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 			args.add("--name");
 			args.add(name);
 		}
+		args.add("--verbose");
+		args.add("--driver-class-path");
+		args.add("/opt/cloudera/parcels/CDH/jars/*");
 		args.add("--class");
 		args.add(mainClass);
 		args.add("--master");
 		args.add(master);
-		args.add("--deploy-mode");
-		args.add("client");
 		if (StringUtils.hasText(conf)) {
 			Collection<String> configs = StringUtils.commaDelimitedListToSet(conf);
 			for (String config : configs) {
@@ -214,7 +215,7 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 			args.addAll(StringUtils.commaDelimitedListToSet(programArgs));
 		}
 		List<String> sparkCommand = new ArrayList<String>();
-		sparkCommand.add("java");
+		sparkCommand.add("/usr/java/jdk1.8.0_65/bin/java");
 		sparkCommand.add(SPARK_SUBMIT_CLASS);
 		sparkCommand.addAll(args);
 
@@ -241,6 +242,12 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 				classPath.add(file);
 			}
 		}
+		for(File file : new File("/opt/cloudera/parcels/CDH/jars/").listFiles()){
+			String f = file.getAbsolutePath();
+			if(f.endsWith(".jar") && !f.matches(".+cloudera.+spark-assembly.+") && !f.matches(".+cloudera.+spark-core.+") && !f.matches(".+cloudera.+avro-tools.+") && !f.matches(".+cloudera.+hadoop-aws.+") && !f.matches(".+cloudera.+hadoop-azure.+") && !f.matches(".+cloudera.+hadoop-common.+") && !f.matches(".+cloudera.+hadoop-hdfs.+") && !f.matches(".+cloudera.+pig.+") && !f.matches(".+cloudera.+tachyon-client.+")){
+				classPath.add(f);
+			}
+		}
 		StringBuilder classPathBuilder = new StringBuilder();
 		String separator = System.getProperty("path.separator");
 		for (String url : classPath) {
@@ -255,6 +262,7 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 		ProcessBuilder pb = new ProcessBuilder(sparkCommand).redirectErrorStream(true);
 		Map<String, String> env = pb.environment();
 		env.put("CLASSPATH", classPathBuilder.toString());
+		env.put("SPARK_CONF_DIR","/etc/spark/conf.cloudera.spark_on_yarn");
 		String msg = "Spark application '" + mainClass + "' is being launched";
 		StringBuilder sparkCommandString = new StringBuilder();
 		for (String cmd : sparkCommand) {
@@ -264,6 +272,8 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 		List<String> sparkLog = new ArrayList<String>();
 		try {
 			Process p = pb.start();
+			Thread ot = this.inheritIO(p.getInputStream(),sparkLog);
+			ot.start();
 			p.waitFor();
 			exitCode = p.exitValue();
 			msg = "Spark application '" + mainClass + "' finished with exit code: " + exitCode;
@@ -273,7 +283,8 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 			else {
 				logger.error(msg);
 			}
-			sparkLog = getProcessOutput(p);
+			//sparkLog = getProcessOutput(p);
+			ot.join();
 			p.destroy();
 		}
 		catch (IOException e) {
@@ -311,13 +322,26 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 			for (String line : sparkLog) {
 				sparkLogMessages.append(line).append("</br>");
 			}
-			stepExecution.getExecutionContext().putString("spark.log", sparkLogMessages.toString());
+			stepExecution.getExecutionContext().putString("spark.log", sparkLogMessages.toString().substring(0,2498));
 			stepExecution.setExitStatus(exitStatus.addExitDescription(msg));
 		}
 
 		return RepeatStatus.FINISHED;
 	}
 
+	private Thread inheritIO (final InputStream src, final List<String> sparkLog) {
+	    return new Thread(new Runnable() {
+	        public void run() {
+	            Scanner sc = new Scanner(src);
+	            while (sc.hasNextLine()){
+	            	String s = sc.nextLine();
+	                sparkLog.add(s);
+			System.out.println(s);
+	            }
+	        }
+	    });
+	}
+	
 	@Override
 	public ExitStatus afterStep(StepExecution stepExecution) {
 		if (exitCode == 0) {
