@@ -261,7 +261,8 @@ public class SparkTasklet implements Tasklet, EnvironmentAware, StepExecutionLis
 				classPathBuilder.append(url);
 			}
 		}
-
+		classPathBuilder.append(separator);
+		classPathBuilder.append("/etc/hadoop/conf.cloudera.yarn");
 		ProcessBuilder pb = new ProcessBuilder(sparkCommand).redirectErrorStream(true);
 		Map<String, String> env = pb.environment();
 		env.put("CLASSPATH", classPathBuilder.toString());
