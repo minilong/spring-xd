@@ -14,6 +14,8 @@ Look for it on the [XD wiki](https://github.com/springsource/spring-xd/wiki). [A
 ## How to build 
 
 Check the documentation on how to build Spring XD [here](http://docs.spring.io/spring-xd/docs/current-SNAPSHOT/reference/html/#building-spring-xd).
+Just build one sub projects using such command: ./gradlew spring-xd-extension-spark:clean build -x test. (Build spring-xd-extension-spark, skipping test).
+
 
 ## Getting Help
 
