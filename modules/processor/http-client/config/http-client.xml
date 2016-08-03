@@ -15,6 +15,7 @@
 		reply-timeout='${replyTimeout}' reply-channel='output'
 		mapped-request-headers="${mappedRequestHeaders}"
 		mapped-response-headers="${mappedResponseHeaders}">
+		<int-http:uri-variable name="content" expression="headers['content']"/>
 	</int-http:outbound-gateway>
 
 	<channel id="output" />
